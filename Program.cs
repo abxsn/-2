@@ -64,12 +64,6 @@ namespace АИС2
                         }
                     case "3":
                         {
-                            if (0 >= logic.patientCount )
-                            {
-                                Console.WriteLine("Недостаточно пациентов или врачей");
-                                Console.ReadKey();
-                                break;
-                            }
                             int numInt = 0;
                             Console.WriteLine("Изменить информацию о пациентах или врачах?:\n1. О врачах\n2. О пациентах");
                             string num1 = Console.ReadLine();
@@ -221,7 +215,7 @@ namespace АИС2
                                 break;
                             }
                             int numInt = 0;
-                            Console.WriteLine("Уволить пациента или врача?");
+                            Console.WriteLine("Уволить пациента или врача?\n1. Врача\n2. Пациента");
                             string num1 = Console.ReadLine();
                             while(int.TryParse(num1, out numInt) == false || numInt>2 || numInt<=0)
                             {
