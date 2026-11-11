@@ -4,43 +4,92 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using BusinessLogic2;
+using Model;
+using LogicToData;
+using Ninject;
+using NinjectModule1;
 
 namespace АИС2
 {
     internal class Program
     {
+
+        /// <summary>
+        /// </summary>
+        /// <returns>Строку пронумерованных специальностей</returns>
+        public static string Specializations()
+        {
+            string s = string.Empty;
+            int cnt = 0;
+            foreach (string a in MedicalCatalog.AllPossibleComplaints.Keys.ToList())
+            {
+                cnt++;
+                s += $"{cnt}. {a}\n";
+            }
+            return s;
+        }
+        /// <summary>
+        /// </summary>
+        /// <returns>Строковое представление списка всех возможных жалоб</returns>
+        public static string AllComplaintsListed()
+        {
+            string result = string.Empty;
+            int cnt = 0;
+            var a = MedicalCatalog.AllPossibleComplaints.Values.SelectMany(s => s).ToList();
+            foreach (string complaint in a)
+            {
+                cnt++;
+                result += $"{cnt.ToString()}. {complaint}\n";
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// </summary>
+        /// <returns>Строковое представление всех докторов и их свойств</returns>
+        public static string AllPatients(IEnumerable<Patient> list)
+        {
+            string result = string.Empty;
+            foreach (Patient patient in list)
+            {
+                result += $"{patient.Id}.\nИмя: {patient.Name}\nЖалобы: {patient.Complaints}\nПредварительный диагноз:{patient.DiagnosisName}\n";
+            }
+            return result;
+        }
+        /// <summary>
+        /// </summary>
+        /// <returns>Строковое представление всех докторов и их свойств</returns>
+        public static string AllDoctors(IEnumerable<Doctor> list)
+        {
+            string result = string.Empty;
+            foreach (Doctor doctor in list)
+            {
+                result += $"{doctor.Id}.\nИмя: {doctor.Name}\nСпециализация: {doctor.Specialization}\nОпыт врача:{doctor.ExperienceYears} лет\n";
+            }
+            return result;
+        }
         static void Main(string[] args)
         {
-            Logic logic = new Logic();
+            IKernel ninjectKernel = new StandardKernel(new NinjectModule());
+            ILogic logic = ninjectKernel.Get<ILogic>();
+            Console.WriteLine("Если пациенту не поставить правильный диагноз, он будет страдать и в итоге умрет.\nЗа каждым пациентом закрепляется строго один врач (но один врач может вести много пациентов), а диагноз ставится правильно, если специализация врача подходит жалобам пациента и его опыта достаточно для определения болезни. \n(чтобы продолжить нажмите enter)");
+            Console.ReadKey();
             while (true)
             {
                 Console.Clear();
                 Console.WriteLine("Введите число");
-                Console.WriteLine("Меню:\n1. Записать пациента к врачу\n2. Просмотреть список пациентов\n3. Изменить информацию о пациентах(или врачах)\n4. Выписать пациента/Уволить врача\n5. Добавить пациента\n6. Добавить врача\n7. Просмотреть список врачей\n8. Начать лечение пациента\n");
+                Console.WriteLine("Меню:\n1. Записать пациента к врачу\n2. Просмотреть список пациентов\n3. Изменить информацию о пациентах(или врачах)\n4. Выписать пациента/Уволить врача\n5. Добавить пациента\n6. Добавить врача\n7. Просмотреть список врачей\n8. Начать лечение пациента(последнего)\n");
                 string num = Console.ReadLine();
-                switch(num)
-                { 
+                switch (num)
+                {
                     case "1":
                         {
-                            if (logic.patientCount > 0 && logic.doctorCount > 0)
+                            Console.Clear();
+                            if (logic.PatientService.Count > 0 && logic.DoctorService.Count > 0)
                             {
-                                int patientIdInt = 0;
-                                int doctorIdInt = 0;
-                                Console.WriteLine($"Введите номер пациента которого вы хотите записать к врачу: \n{logic.AllPatients()}");
-                                string patientId = Console.ReadLine();
-                                while (int.TryParse(patientId, out patientIdInt) == false || patientIdInt-1 >= logic.PatientCountDoctorCountSpecializationCountSympthomsCount()[0] || patientIdInt < 0)
-                                {
-                                    Console.WriteLine($"Введите номер пациента которого вы хотите записать к врачу: \n{logic.AllPatients()}");
-                                    patientId = Console.ReadLine();
-                                }
-                                Console.WriteLine($"Введите номер доступного врача: {logic.AllDoctors()}");
-                                string doctorId = Console.ReadLine();
-                                while (int.TryParse(doctorId, out doctorIdInt) == false || doctorIdInt-1 >= logic.PatientCountDoctorCountSpecializationCountSympthomsCount()[1] || doctorIdInt < 0)
-                                {
-                                    Console.WriteLine($"Введите номер доступного врача: {logic.AllDoctors()}");
-                                    doctorId = Console.ReadLine();
-                                }
-                                Console.WriteLine(logic.ArrangeAnAppointment(patientIdInt-1, doctorIdInt-1));
+                                int patientIdInt = ValidatedConsoleInput.ValidateInt($"Введите номер пациента которого вы хотите записать к врачу: \n{AllPatients(logic.PatientService.GetAll())}", logic.PatientService.GetExistingIds());
+                                int doctorIdInt = ValidatedConsoleInput.ValidateInt($"Введите номер доступного врача: {AllDoctors(logic.DoctorService.GetAll())}", logic.DoctorService.GetExistingIds());
+                                Console.WriteLine(logic.AppointmentService.ArrangeAnAppointment(patientIdInt, doctorIdInt));
                             }
                             else
                             {
@@ -51,9 +100,10 @@ namespace АИС2
                         }
                     case "2":
                         {
-                            if (logic.patientCount > 0 )
+                            Console.Clear();
+                            if (logic.PatientService.Count > 0)
                             {
-                                Console.WriteLine(logic.AllPatients());
+                                Console.WriteLine(AllPatients(logic.PatientService.GetAll()));
                             }
                             else
                             {
@@ -64,72 +114,35 @@ namespace АИС2
                         }
                     case "3":
                         {
-                            int numInt = 0;
-                            Console.WriteLine("Изменить информацию о пациентах или врачах?:\n1. О врачах\n2. О пациентах");
-                            string num1 = Console.ReadLine();
-                            while (int.TryParse(num1, out numInt) == false || numInt > 2 || numInt <= 0)
-                            {
-                                Console.WriteLine("Изменить информацию о пациентах или врачах?:\n1. О врачах\n2. О пациентах");
-                                num1 = Console.ReadLine();
-                            }
-                            int doctorNumInt = 0;
-                            int patientNumInt = 0;
+                            Console.Clear();
+                            int numInt = ValidatedConsoleInput.ValidateInt("Изменить информацию о пациентах или врачах?:\n1. О врачах\n2. О пациентах", 1, 2);
                             switch (numInt)
                             {
                                 case 1:
                                     {
-                                        if (!(0 >= logic.doctorCount))
+                                        if (!(0 >= logic.DoctorService.Count))
                                         {
-                                            int numberInt = 0;
-                                            Console.WriteLine("Введите номер врача");
-                                            Console.WriteLine(logic.AllDoctors());
-                                            string doctorNum = Console.ReadLine();
-                                            while (int.TryParse(doctorNum, out doctorNumInt) == false || doctorNumInt < 0 || doctorNumInt > logic.doctorCount)
-                                            {
-                                                Console.WriteLine("Введите номер врача");
-                                                Console.WriteLine(logic.AllDoctors());
-                                                doctorNum = Console.ReadLine();
-                                            }
-                                            Console.WriteLine($"Введите номер характеристики, которую вы хотите изменить:\n1. Специализация\n2. Имя\n 3. Опыт работы");
-                                            string number = Console.ReadLine();
-                                            while (int.TryParse(number, out numberInt) == false || numberInt < 0 || numberInt > 3)
-                                            {
-                                                Console.WriteLine($"Введите номер характеристики, которую вы хотите изменить:\n1. Специализация\n2. Имя\n 3. Опыт работы");
-                                                number = Console.ReadLine();
-                                            }
+                                            int doctorNumInt = ValidatedConsoleInput.ValidateInt($"Введите номер врача\n{AllDoctors(logic.DoctorService.GetAll())}", logic.DoctorService.GetExistingIds());
+                                            int numberInt = ValidatedConsoleInput.ValidateInt($"Введите номер характеристики, которую вы хотите изменить:\n1. Специализация\n2. Имя\n 3. Опыт работы", 1, 3);
                                             switch (numberInt)
                                             {
                                                 case 2:
                                                     {
                                                         Console.WriteLine("Введите имя доктора");
                                                         string doctorName = Console.ReadLine();
-                                                        logic.DoctorRedactor(doctorNumInt - 1, 0, doctorName);
+                                                        logic.DoctorService.DoctorRedactor(doctorNumInt, 0, doctorName);
                                                         break;
                                                     }
                                                 case 1:
                                                     {
-                                                        int doctorSpecializationInt = 0;
-                                                        Console.WriteLine($"Введите специализацию доктора: {logic.Specializations()}");
-                                                        string doctorSpecialization = Console.ReadLine();
-                                                        while (int.TryParse(doctorSpecialization, out doctorSpecializationInt) == false || doctorSpecializationInt - 1 >= logic.PatientCountDoctorCountSpecializationCountSympthomsCount()[2] || doctorSpecializationInt < 0)
-                                                        {
-                                                            Console.WriteLine($"Введите специализацию доктора: {logic.Specializations()}");
-                                                            doctorSpecialization = Console.ReadLine();
-                                                        }
-                                                        logic.DoctorRedactor(doctorNumInt - 1, 1, (doctorSpecializationInt-1).ToString());
+                                                        int doctorSpecializationInt = ValidatedConsoleInput.ValidateInt($"Введите специализацию доктора: \n{Specializations()}", 1, logic.complaintsCount);
+                                                        logic.DoctorService.DoctorRedactor(doctorNumInt, 1, MedicalCatalog.AllPossibleComplaints.Keys.ToList()[doctorSpecializationInt - 1].ToString());
                                                         break;
                                                     }
                                                 case 3:
                                                     {
-                                                        int doctorExperienceInt = 0;
-                                                        Console.WriteLine($"Введите опыт доктора: \n1. 1 год\n 2. 2 года\n3. 3 года\n4. 4 года\n5. 5 лет и более");
-                                                        string doctorExperience = Console.ReadLine();
-                                                        while (int.TryParse(doctorExperience, out doctorExperienceInt) == false || doctorExperienceInt > 5 || doctorExperienceInt <= 0)
-                                                        {
-                                                            Console.WriteLine($"Введите опыт доктора: \n1. 1 год\n 2. 2 года\n3. 3 года\n4. 4 года\n5. 5 лет и более");
-                                                            doctorExperience = Console.ReadLine();
-                                                        }
-                                                        logic.DoctorRedactor(doctorNumInt - 1, 2, doctorExperienceInt.ToString());
+                                                        int doctorExperienceInt = ValidatedConsoleInput.ValidateInt($"Введите опыт доктора: \n1. 1 год\n 2. 2 года\n3. 3 года\n4. 4 года\n5. 5 лет и более", 1, 5);
+                                                        logic.DoctorService.DoctorRedactor(doctorNumInt, 2, doctorExperienceInt.ToString());
                                                         break;
                                                     }
 
@@ -145,46 +158,23 @@ namespace АИС2
                                     }
                                 case 2:
                                     {
-                                        if (!(0 >= logic.patientCount))
+                                        if (!(0 >= logic.PatientService.Count))
                                         {
-                                            int numberInt = 0;
-                                            Console.WriteLine("Введите номер пациента");
-                                            Console.WriteLine(logic.AllPatients());
-                                            string patientNum = Console.ReadLine();
-                                            while (int.TryParse(patientNum, out patientNumInt) == false || patientNumInt < 0 || patientNumInt > logic.patientCount)
-                                            {
-                                                Console.WriteLine("Введите номер пациента");
-                                                Console.WriteLine(logic.AllPatients());
-                                                patientNum = Console.ReadLine();
-                                            }
-                                            Console.WriteLine($"Введите номер характеристики, которую вы хотите изменить:\n1. Жалобы\n2. Имя\n 3. Диагноз");
-                                            string number = Console.ReadLine();
-                                            while (int.TryParse(number, out numberInt) == false || numberInt < 0 || numberInt > 3)
-                                            {
-                                                Console.WriteLine($"Введите номер характеристики, которую вы хотите изменить:\n1. Жалобы\n2. Имя\n 3. Диагноз");
-                                                number = Console.ReadLine();
-                                            }
-                                            Console.WriteLine(numberInt);
+                                            int patientNumInt = ValidatedConsoleInput.ValidateInt($"Введите номер пациента\n{AllPatients(logic.PatientService.GetAll())}", logic.PatientService.GetExistingIds());
+                                            int numberInt = ValidatedConsoleInput.ValidateInt($"Введите номер характеристики, которую вы хотите изменить:\n1. Жалоба\n2. Имя\n 3. Диагноз", 1, 3);
                                             switch (numberInt)
                                             {
                                                 case 2:
                                                     {
                                                         Console.WriteLine("Введите имя пациента");
                                                         string patientName = Console.ReadLine();
-                                                        logic.PatientRedactor(patientNumInt - 1, 0, patientName);
+                                                        logic.PatientService.PatientRedactor(patientNumInt, 0, patientName);
                                                         break;
                                                     }
                                                 case 1:
                                                     {
-                                                        int patientComplaintsInt = 0;
-                                                        Console.WriteLine($"Введите жалобы пациента: {logic.AllComplaintsListed()}");
-                                                        string patientComplaints = Console.ReadLine();
-                                                        while (int.TryParse(patientComplaints, out patientComplaintsInt) == false || patientComplaintsInt - 1 >= logic.PatientCountDoctorCountSpecializationCountSympthomsCount()[3] || patientComplaintsInt - 1 < 0)
-                                                        {
-                                                            Console.WriteLine($"Введите жалобы пациента: {logic.AllComplaintsListed()}");
-                                                            patientComplaints = Console.ReadLine();
-                                                        }
-                                                        logic.PatientRedactor(patientNumInt - 1, 1, (patientComplaintsInt - 1).ToString());
+                                                        int patientComplaintsInt = ValidatedConsoleInput.ValidateInt($"Введите жалобу пациента: {AllComplaintsListed()}", 1, logic.complaintsCount);
+                                                        logic.PatientService.PatientRedactor(patientNumInt, 1, MedicalCatalog.AllPossibleComplaints.Values.SelectMany(s => s).ToList()[patientComplaintsInt - 1].ToString());
                                                         break;
                                                     }
                                                 case 3:
@@ -192,7 +182,6 @@ namespace АИС2
                                                         Console.WriteLine("Диагноз ставит доктор, а не вы");
                                                         break;
                                                     }
-
                                             }
                                             break;
                                         }
@@ -208,50 +197,26 @@ namespace АИС2
                         }
                     case "4":
                         {
-                            if (0 >= logic.patientCount || 0 >= logic.doctorCount)
+                            Console.Clear();
+                            if (0 >= logic.PatientService.Count || 0 >= logic.DoctorService.Count)
                             {
                                 Console.WriteLine("Недостаточно пациентов или врачей");
                                 Console.ReadKey();
                                 break;
                             }
-                            int numInt = 0;
-                            Console.WriteLine("Уволить пациента или врача?\n1. Врача\n2. Пациента");
-                            string num1 = Console.ReadLine();
-                            while(int.TryParse(num1, out numInt) == false || numInt>2 || numInt<=0)
-                            {
-                                Console.WriteLine("Уволить пациента или врача?:\n1. Врача\n2. Пациента");
-                                num1 = Console.ReadLine();
-                            }
-                            int doctorNumInt = 0;
-                            int patientNumInt = 0;
+                            int numInt = ValidatedConsoleInput.ValidateInt("Уволить пациента или врача?\n1. Врача\n2. Пациента", 1, 2);
                             switch (numInt)
                             {
                                 case 1:
                                     {
-                                        Console.WriteLine("Введите номер врача");
-                                        Console.WriteLine(logic.AllDoctors());
-                                        string doctorNum = Console.ReadLine();
-                                        while(int.TryParse(doctorNum, out doctorNumInt) == false || doctorNumInt < 0 || doctorNumInt > logic.doctorCount)
-                                        {
-                                            Console.WriteLine("Введите номер врача");
-                                            Console.WriteLine(logic.AllDoctors());
-                                            doctorNum = Console.ReadLine();
-                                        }
-                                        logic.RemoveDoctor(doctorNumInt - 1);
+                                        int doctorNumInt = ValidatedConsoleInput.ValidateInt($"Введите номер врача\n{AllDoctors(logic.DoctorService.GetAll())})", logic.DoctorService.GetExistingIds());
+                                        logic.DoctorService.RemoveDoctor(doctorNumInt);
                                         break;
                                     }
                                 case 2:
                                     {
-                                        Console.WriteLine("Введите номер пациента");
-                                        Console.WriteLine(logic.AllPatients());
-                                        string patientNum = Console.ReadLine();
-                                        while (int.TryParse(patientNum, out patientNumInt) == false || patientNumInt < 0 || patientNumInt > logic.patientCount)
-                                        {
-                                            Console.WriteLine("Введите номер пациента");
-                                            Console.WriteLine(logic.AllPatients());
-                                            patientNum = Console.ReadLine();
-                                        }
-                                        logic.RemovePatient(patientNumInt - 1);
+                                        int patientNumInt = ValidatedConsoleInput.ValidateInt($"Введите номер пациента\n{AllPatients(logic.PatientService.GetAll())}", logic.PatientService.GetExistingIds());
+                                        logic.PatientService.RemovePatient(patientNumInt);
                                         break;
                                     }
                             }
@@ -259,54 +224,38 @@ namespace АИС2
                         }
                     case "5":
                         {
-                            int patientComplaintsInt;
+                            Console.Clear();
                             Console.WriteLine("Введите имя пациента");
                             string patientName = Console.ReadLine();
-                            Console.WriteLine($"Введите жалобы пациента: {logic.AllComplaintsListed()}");
-                            string patientComplaints = Console.ReadLine();
-                            while (int.TryParse(patientComplaints, out patientComplaintsInt) == false || patientComplaintsInt-1 >= logic.PatientCountDoctorCountSpecializationCountSympthomsCount()[3] || patientComplaintsInt-1 < 0)
-                            {
-                                Console.WriteLine($"Введите жалобы пациента: {logic.AllComplaintsListed()}");
-                                patientComplaints = Console.ReadLine();
-                            }
-                            logic.AddPatient(patientName, patientComplaintsInt-1);
+                            int patientComplaintsInt = ValidatedConsoleInput.ValidateInt($"Введите жалобу пациента:\n{AllComplaintsListed()}", 1, logic.complaintsCount);
+                            logic.PatientService.AddPatient(patientName, patientComplaintsInt - 1);
                             break;
                         }
                     case "6":
                         {
-                            int doctorExperienceInt;
-                            int doctorSpecializationInt;
+                            Console.Clear();
                             Console.WriteLine("Введите имя доктора");
                             string doctorName = Console.ReadLine();
-                            Console.WriteLine($"Введите опыт доктора: \n1. 1 год\n 2. 2 года\n3. 3 года\n4. 4 года\n5. 5 лет и более");
-                            string doctorExperience = Console.ReadLine();
-                            while (int.TryParse(doctorExperience, out doctorExperienceInt) == false || doctorExperienceInt > 5 || doctorExperienceInt <= 0)
-                            {
-                                Console.WriteLine($"Введите опыт доктора: \n1. 1 год\n 2. 2 года\n3. 3 года\n4. 4 года\n5. 5 лет и более");
-                                doctorExperience = Console.ReadLine();
-                            }
-                            Console.WriteLine($"Введите специализацию доктора: {logic.Specializations()}");
-                            string doctorSpecialization = Console.ReadLine();
-                            while (int.TryParse(doctorSpecialization, out doctorSpecializationInt) == false || doctorSpecializationInt-1 >= logic.PatientCountDoctorCountSpecializationCountSympthomsCount()[2] || doctorSpecializationInt < 0)
-                            {
-                                Console.WriteLine($"Введите специализацию доктора: {logic.Specializations()}");
-                                doctorSpecialization = Console.ReadLine();
-                            }
-                            logic.AddDoctor(doctorName, doctorSpecializationInt-1, doctorExperienceInt);
+                            int doctorExperienceInt = ValidatedConsoleInput.ValidateInt($"Введите опыт доктора: \n1. 1 год\n2. 2 года\n3. 3 года\n4. 4 года\n5. 5 лет и более", 1, 5);
+                            Console.WriteLine("Доступные категории и болезни для диагностики:\n- Общие симптомы (Хроническая усталость, Авитаминоз, Переутомление)\n- Органы дыхания (ОРВИ, Острый бронхит, Пневмония, Ангина)\n- Нервная система (Мигрень, ВСД, Невралгия)\n- Сердечно-сосудистая система (Гипертония, Стенокардия, Аритмия)\n- ЖКТ (Острый гастрит, Язва желудка, Панкреатит, Пищевое отравление)\nесли прочитали нажмите enter");
                             Console.ReadKey();
+                            int doctorSpecializationInt = ValidatedConsoleInput.ValidateInt($"Введите специализацию доктора: \n{Specializations()}", 1, logic.specializationsCount);
+                            logic.DoctorService.AddDoctor(doctorName, doctorSpecializationInt - 1, doctorExperienceInt);
                             break;
                         }
                     case "8":
                         {
-                            Console.WriteLine(logic.StartTreatment());
+                            Console.Clear();
+                            Console.WriteLine(logic.TreatmentService.StartTreatment());
                             Console.ReadKey();
                             break;
                         }
                     case "7":
                         {
-                            if (logic.doctorCount > 0)
+                            Console.Clear();
+                            if (logic.DoctorService.Count > 0)
                             {
-                                Console.WriteLine(logic.AllDoctors());
+                                Console.WriteLine(AllDoctors(logic.DoctorService.GetAll()));
                             }
                             else
                             {
@@ -319,4 +268,5 @@ namespace АИС2
             }
         }
     }
+
 }
